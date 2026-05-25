@@ -1,59 +1,343 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# BTS.ID Product Management API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+REST API untuk manajemen produk dengan autentikasi berbasis token menggunakan Laravel Sanctum.
 
-## About Laravel
+## Tech Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Laravel** 12 (PHP 8.2)
+- **MySQL** 8.0
+- **Laravel Sanctum** -> token-based authentication
+- **Docker** -> containerized deployment
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Fitur
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Autentikasi dengan username & password (access token + refresh token)
+- CRUD produk dengan pagination, search, dan filter kategori
+- Caching response GET produk (60 detik)
+- Rate limiting: 3x/menit untuk auth, 1x/5 detik untuk product write
+- CORS enabled untuk semua origin
+- Timezone Asia/Jakarta
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Cara Menjalankan
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+**Prasyarat:** Docker & Docker Compose terinstall.
 
-## Laravel Sponsors
+1. Copy file environment:
+   ```bash
+   cp .env.example .env
+   ```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+2. Generate app key:
+   ```bash
+   php artisan key:generate
+   ```
 
-### Premium Partners
+3. Jalankan Docker:
+   ```bash
+   docker compose up --build -d
+   ```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+4. Jalankan migration dan seeder:
+   ```bash
+   docker compose exec app php artisan migrate --seed --force
+   ```
 
-## Contributing
+5. Aplikasi berjalan di `http://localhost:8000`
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## Default Users (Seeder)
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+| Username   | Password   |
+|------------|------------|
+| `jhon_doe` | `password` |
+| `jane_doe` | `password` |
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## API Endpoints
 
-## License
+Base URL: `http://localhost:8000/api`
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Auth
+
+| Method | Endpoint            | Auth | Deskripsi                   |
+|--------|---------------------|------|-----------------------------|
+| POST   | `/auth/register`    | -    | Registrasi pengguna baru    |
+| POST   | `/auth/login`       | -    | Login dan dapatkan token    |
+| POST   | `/auth/refresh`     | -    | Refresh access token        |
+| POST   | `/auth/logout`      | Yes  | Logout dan invalidate token |
+
+### Products
+
+| Method | Endpoint            | Auth | Deskripsi             |
+|--------|---------------------|------|-----------------------|
+| GET    | `/products`         | -    | Ambil semua produk    |
+| GET    | `/products/{id}`    | -    | Ambil detail produk   |
+| POST   | `/products`         | Yes  | Tambah produk baru    |
+| PUT    | `/products/{id}`    | Yes  | Update produk         |
+| DELETE | `/products/{id}`    | Yes  | Hapus produk          |
+
+**Query params GET `/products`:**
+- `search` -> cari berdasarkan judul
+- `category` -> filter berdasarkan kategori
+- `limit` -> item per halaman (default: 10, max: 100)
+- `page` -> nomor halaman (default: 1)
+
+---
+
+## Contoh Request
+
+### Register
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "username": "jhon_doe",
+  "password": "supersecret",
+  "password_confirmation": "supersecret"
+}
+```
+
+Response `201`:
+```json
+{
+  "status": 201,
+  "message": "Registration successful"
+}
+```
+
+---
+
+### Login
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username": "jhon_doe",
+  "password": "password"
+}
+```
+
+Response `200`:
+```json
+{
+  "status": 200,
+  "authentication_token": "1|abc123...",
+  "refresh_token": "xyz789...",
+  "user": {
+    "id": 1,
+    "username": "jhon_doe"
+  }
+}
+```
+
+---
+
+### Refresh Token
+```http
+POST /api/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "xyz789..."
+}
+```
+
+Response `200`:
+```json
+{
+  "status": 200,
+  "authentication_token": "2|newtoken123...",
+  "refresh_token": "newrefresh456..."
+}
+```
+
+---
+
+### Logout
+```http
+POST /api/auth/logout
+Authorization: Bearer 1|abc123...
+```
+
+Response `200`:
+```json
+{
+  "status": 200,
+  "message": "Logged out successfully"
+}
+```
+
+---
+
+### GET All Products
+```http
+GET /api/products?limit=10&page=1
+```
+
+Response `200`:
+```json
+{
+  "status": 200,
+  "data": [
+    {
+      "id": 1,
+      "title": "Awesome T-Shirt",
+      "price": 99.99,
+      "description": "High-quality cotton t-shirt",
+      "category": "Clothes",
+      "images": ["https://example.com/image.jpg"],
+      "created_at": "2026-05-25 10:00:00",
+      "created_by": "jhon_doe",
+      "created_by_id": "1",
+      "updated_at": "2026-05-25 10:00:00",
+      "updated_by": "jhon_doe",
+      "updated_by_id": "1"
+    }
+  ],
+  "meta": {
+    "total": 10,
+    "per_page": 10,
+    "current_page": 1,
+    "last_page": 1
+  }
+}
+```
+
+---
+
+### GET Product by ID
+```http
+GET /api/products/1
+```
+
+Response `200`:
+```json
+{
+  "status": 200,
+  "data": {
+    "id": 1,
+    "title": "Awesome T-Shirt",
+    "price": 99.99,
+    "description": "High-quality cotton t-shirt",
+    "category": "Clothes",
+    "images": ["https://example.com/image.jpg"],
+    "created_at": "2026-05-25 10:00:00",
+    "created_by": "jhon_doe",
+    "created_by_id": "1",
+    "updated_at": "2026-05-25 10:00:00",
+    "updated_by": "jhon_doe",
+    "updated_by_id": "1"
+  }
+}
+```
+
+---
+
+### POST Create Product
+```http
+POST /api/products
+Content-Type: application/json
+Authorization: Bearer 1|abc123...
+
+{
+  "title": "Awesome T-Shirt",
+  "price": 99.99,
+  "description": "High-quality cotton t-shirt",
+  "category": "Clothes",
+  "images": ["https://example.com/image.jpg"]
+}
+```
+
+Response `201`:
+```json
+{
+  "status": 201,
+  "data": {
+    "id": 1,
+    "title": "Awesome T-Shirt",
+    "price": 99.99,
+    "description": "High-quality cotton t-shirt",
+    "category": "Clothes",
+    "images": ["https://example.com/image.jpg"],
+    "created_at": "2026-05-25 10:00:00",
+    "created_by": "jhon_doe",
+    "created_by_id": "1",
+    "updated_at": "2026-05-25 10:00:00",
+    "updated_by": "jhon_doe",
+    "updated_by_id": "1"
+  }
+}
+```
+
+---
+
+### PUT Update Product
+```http
+PUT /api/products/1
+Content-Type: application/json
+Authorization: Bearer 1|abc123...
+
+{
+  "title": "Updated T-Shirt",
+  "price": 149.99
+}
+```
+
+Response `200`:
+```json
+{
+  "status": 200,
+  "data": {
+    "id": 1,
+    "title": "Updated T-Shirt",
+    "price": 149.99,
+    "description": "High-quality cotton t-shirt",
+    "category": "Clothes",
+    "images": ["https://example.com/image.jpg"],
+    "created_at": "2026-05-25 10:00:00",
+    "created_by": "jhon_doe",
+    "created_by_id": "1",
+    "updated_at": "2026-05-25 11:00:00",
+    "updated_by": "jhon_doe",
+    "updated_by_id": "1"
+  }
+}
+```
+
+---
+
+### DELETE Product
+```http
+DELETE /api/products/1
+Authorization: Bearer 1|abc123...
+```
+
+Response `200`:
+```json
+{
+  "status": 200,
+  "message": "Product deleted successfully"
+}
+```
+
+---
+
+## Postman Collection
+
+Import file `docs/postman_collection.json` ke Postman.
+
+---
+
+## Rate Limiting
+
+| Endpoint                     | Limit           |
+|------------------------------|-----------------|
+| `POST /auth/register`        | 3x per 60 detik |
+| `POST /auth/login`           | 3x per 60 detik |
+| `POST/PUT/DELETE /products`  | 1x per 5 detik  |
