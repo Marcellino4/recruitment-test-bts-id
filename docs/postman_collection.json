@@ -1,0 +1,453 @@
+{
+  "info": {
+    "name": "BTS.ID API",
+    "description": "REST API untuk manajemen produk dan autentikasi pengguna.\n\n## Cara Pakai\n1. Jalankan **Register** untuk buat akun\n2. Jalankan **Login** → token otomatis tersimpan\n3. Semua request Products (POST/PUT/DELETE) pakai token otomatis\n\n## Rate Limit\n- Auth (register/login): max 3x per 60 detik\n- Product write (POST/PUT/DELETE): max 1x per 5 detik",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "bts-id-recruitment-api-v2"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api",
+      "type": "string",
+      "description": "Ganti ke URL server"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string",
+      "description": "Terisi otomatis setelah Login"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string",
+      "description": "Terisi otomatis setelah Login"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Endpoint autentikasi. Rate limit: 3 request per 60 detik.",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 - Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Response punya field user', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('message');",
+                  "  pm.expect(json).to.have.property('user');",
+                  "  pm.expect(json.user).to.have.property('username');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"jhon_doe\",\n  \"password\": \"supersecret\",\n  \"password_confirmation\": \"supersecret\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Mendaftarkan pengguna baru.\n\n**Validasi:**\n- `username`: wajib, 3-50 karakter, hanya huruf/angka/underscore, unik\n- `password`: wajib, min 6 karakter\n- `password_confirmation`: harus sama dengan password\n\n**Rate limit:** 3x per 60 detik"
+          },
+          "response": [
+            {
+              "name": "201 - Register Berhasil",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 201,\n  \"message\": \"Registration successful\"\n}"
+            },
+            {
+              "name": "400 - Validation Error",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Validation failed\",\n  \"errors\": {\n    \"username\": [\"The username has already been taken.\"],\n    \"password\": [\"The password field confirmation does not match.\"]\n  }\n}"
+            },
+            {
+              "name": "429 - Too Many Requests",
+              "status": "Too Many Requests",
+              "code": 429,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Too many requests. Please try again later.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 - OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Response punya tokens', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('authentication_token');",
+                  "  pm.expect(json).to.have.property('refresh_token');",
+                  "  pm.collectionVariables.set('auth_token', json.authentication_token);",
+                  "  pm.collectionVariables.set('refresh_token', json.refresh_token);",
+                  "  console.log('Token tersimpan:', json.authentication_token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"jhon_doe\",\n  \"password\": \"password\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Login dan dapatkan token.\n\nSetelah berhasil, `authentication_token` dan `refresh_token` otomatis tersimpan ke collection variable.\n\n**Rate limit:** 3x per 60 detik"
+          },
+          "response": [
+            {
+              "name": "200 - Login Berhasil",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"authentication_token\": \"1|abc123def456...\",\n  \"refresh_token\": \"xyz789uvw321...\",\n  \"user\": {\n    \"id\": 1,\n    \"username\": \"jhon_doe\"\n  }\n}"
+            },
+            {
+              "name": "401 - Kredensial Salah",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Invalid credentials\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 - OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "if (json.authentication_token) {",
+                  "  pm.collectionVariables.set('auth_token', json.authentication_token);",
+                  "  pm.collectionVariables.set('refresh_token', json.refresh_token);",
+                  "  console.log('Token diperbarui');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Mendapatkan access token baru menggunakan refresh token. Refresh token lama akan dihapus dan diganti yang baru.\n\nToken berlaku 30 hari."
+          },
+          "response": [
+            {
+              "name": "200 - Token Diperbarui",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"authentication_token\": \"2|newtoken123...\",\n  \"refresh_token\": \"newrefresh456...\"\n}"
+            },
+            {
+              "name": "401 - Refresh Token Invalid",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Invalid or expired refresh token\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer 1|your_token_here" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Logout dan invalidate token yang sedang aktif.\n\n**Memerlukan Authorization header.**"
+          },
+          "response": [
+            {
+              "name": "200 - Logout Berhasil",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Logged out successfully\"\n}"
+            },
+            {
+              "name": "401 - Unauthenticated",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Unauthenticated\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "description": "Endpoint manajemen produk.\n\nGET tidak perlu token.\nPOST / PUT / DELETE butuh Authorization header + rate limit 1x per 5 detik.",
+      "item": [
+        {
+          "name": "GET All Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products?limit=10&page=1",
+              "host": ["{{base_url}}"],
+              "path": ["products"],
+              "query": [
+                { "key": "search", "value": "shirt", "disabled": true, "description": "Cari berdasarkan judul produk" },
+                { "key": "category", "value": "Clothes", "disabled": true, "description": "Filter berdasarkan kategori" },
+                { "key": "limit", "value": "10", "description": "Item per halaman (default 10, max 100)" },
+                { "key": "page", "value": "1", "description": "Nomor halaman (default 1)" }
+              ]
+            },
+            "description": "Ambil semua produk.\n\n**Query params (semua opsional):**\n- `search` → cari berdasarkan judul\n- `category` → filter kategori\n- `limit` → item per halaman (default: 10, max: 100)\n- `page` → nomor halaman (default: 1)\n\nResponse di-cache 60 detik."
+          },
+          "response": [
+            {
+              "name": "200 - Daftar Produk",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": 1,\n      \"title\": \"Awesome T-Shirt\",\n      \"price\": 99.99,\n      \"description\": \"High-quality cotton t-shirt\",\n      \"category\": \"Clothes\",\n      \"images\": [\"https://placeimg.com/640/480/any\"],\n      \"created_at\": \"2025-01-01 15:01:04\",\n      \"created_by\": \"jhon_doe\",\n      \"created_by_id\": \"1\",\n      \"updated_at\": \"2025-01-01 15:01:04\",\n      \"updated_by\": \"jhon_doe\",\n      \"updated_by_id\": \"1\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"per_page\": 10,\n    \"current_page\": 1,\n    \"last_page\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/products/1",
+              "host": ["{{base_url}}"],
+              "path": ["products", "1"]
+            },
+            "description": "Ambil detail satu produk berdasarkan ID.\n\nJika tidak ditemukan → **404**.\nResponse di-cache 60 detik."
+          },
+          "response": [
+            {
+              "name": "200 - Detail Produk",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"title\": \"Awesome T-Shirt\",\n    \"price\": 99.99,\n    \"description\": \"High-quality cotton t-shirt\",\n    \"category\": \"Clothes\",\n    \"images\": [\"https://placeimg.com/640/480/any\"],\n    \"created_at\": \"2025-01-01 15:01:04\",\n    \"created_by\": \"jhon_doe\",\n    \"created_by_id\": \"1\",\n    \"updated_at\": \"2025-01-01 15:01:04\",\n    \"updated_by\": \"jhon_doe\",\n    \"updated_by_id\": \"1\"\n  }\n}"
+            },
+            {
+              "name": "404 - Produk Tidak Ditemukan",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Product not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 - Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Product punya semua field wajib', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data).to.have.property('id');",
+                  "  pm.expect(data).to.have.property('title');",
+                  "  pm.expect(data).to.have.property('price');",
+                  "  pm.expect(data).to.have.property('category');",
+                  "  pm.expect(data.images).to.be.an('array').with.lengthOf.at.least(1);",
+                  "  pm.expect(data).to.have.property('created_by');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer 1|your_token_here" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Awesome T-Shirt\",\n  \"price\": 99.99,\n  \"description\": \"High-quality cotton t-shirt\",\n  \"category\": \"Clothes\",\n  \"images\": [\n    \"https://placeimg.com/640/480/any\"\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/products",
+              "host": ["{{base_url}}"],
+              "path": ["products"]
+            },
+            "description": "Tambah produk baru.\n\n**Memerlukan Authorization header.**\n\n**Field wajib:** `title`, `price`, `category`, `images` (min 1 URL)\n**Field opsional:** `description`\n\n**Rate limit:** 1x per 5 detik"
+          },
+          "response": [
+            {
+              "name": "201 - Produk Dibuat",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"title\": \"Awesome T-Shirt\",\n    \"price\": 99.99,\n    \"description\": \"High-quality cotton t-shirt\",\n    \"category\": \"Clothes\",\n    \"images\": [\"https://placeimg.com/640/480/any\"],\n    \"created_at\": \"2025-01-01 15:01:04\",\n    \"created_by\": \"jhon_doe\",\n    \"created_by_id\": \"1\",\n    \"updated_at\": \"2025-01-01 15:01:04\",\n    \"updated_by\": \"jhon_doe\",\n    \"updated_by_id\": \"1\"\n  }\n}"
+            },
+            {
+              "name": "400 - Validation Error",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Validation failed\",\n  \"errors\": {\n    \"title\": [\"The title field is required.\"],\n    \"price\": [\"The price field is required.\"],\n    \"category\": [\"The category field is required.\"],\n    \"images\": [\"The images field is required.\"]\n  }\n}"
+            },
+            {
+              "name": "401 - Unauthenticated",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Unauthenticated\"\n}"
+            },
+            {
+              "name": "429 - Rate Limit (5 detik)",
+              "status": "Too Many Requests",
+              "code": 429,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Too many requests. Please wait 5 second(s) before retrying.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "PUT Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer 1|your_token_here" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated T-Shirt\",\n  \"price\": 149.99,\n  \"description\": \"Premium quality cotton t-shirt\",\n  \"category\": \"Clothes\",\n  \"images\": [\n    \"https://placeimg.com/640/480/any\",\n    \"https://placeimg.com/640/480/tech\"\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/products/1",
+              "host": ["{{base_url}}"],
+              "path": ["products", "1"]
+            },
+            "description": "Update produk berdasarkan ID.\n\n**Memerlukan Authorization header.**\n\nSemua field bersifat **opsional** (partial update — hanya kirim field yang ingin diubah).\n\n**Rate limit:** 1x per 5 detik"
+          },
+          "response": [
+            {
+              "name": "200 - Produk Diupdate",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"title\": \"Updated T-Shirt\",\n    \"price\": 149.99,\n    \"description\": \"Premium quality cotton t-shirt\",\n    \"category\": \"Clothes\",\n    \"images\": [\"https://placeimg.com/640/480/any\"],\n    \"created_at\": \"2025-01-01 15:01:04\",\n    \"created_by\": \"jhon_doe\",\n    \"created_by_id\": \"1\",\n    \"updated_at\": \"2025-01-01 16:00:00\",\n    \"updated_by\": \"jhon_doe\",\n    \"updated_by_id\": \"1\"\n  }\n}"
+            },
+            {
+              "name": "404 - Produk Tidak Ditemukan",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Product not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "DELETE Product",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer 1|your_token_here" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/1",
+              "host": ["{{base_url}}"],
+              "path": ["products", "1"]
+            },
+            "description": "Hapus produk berdasarkan ID.\n\n**Memerlukan Authorization header.**\n\n**Rate limit:** 1x per 5 detik"
+          },
+          "response": [
+            {
+              "name": "200 - Produk Dihapus",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Product deleted successfully\"\n}"
+            },
+            {
+              "name": "404 - Produk Tidak Ditemukan",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Product not found\"\n}"
+            },
+            {
+              "name": "401 - Unauthenticated",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Unauthenticated\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
